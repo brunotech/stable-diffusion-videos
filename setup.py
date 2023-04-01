@@ -14,9 +14,7 @@ def get_version() -> str:
 with open("requirements.txt", "r") as f:
     requirements = f.read().splitlines()
 
-extras = {}
-extras['realesrgan'] = ['realesrgan==0.2.5.0']
-
+extras = {'realesrgan': ['realesrgan==0.2.5.0']}
 setup(
     name="stable_diffusion_videos",
     version=get_version(),

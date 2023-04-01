@@ -42,10 +42,7 @@ def get_spec_norm(wav, sr, n_mels=512, hop_length=704):
     # Obtain maximum value per time-frame
     spec_max = np.amax(spec_raw, axis=0)
 
-    # Normalize all values between 0 and 1
-    spec_norm = (spec_max - np.min(spec_max)) / np.ptp(spec_max)
-
-    return spec_norm
+    return (spec_max - np.min(spec_max)) / np.ptp(spec_max)
 
 
 def get_timesteps_arr(audio_filepath, offset, duration, fps=30, margin=(1.0, 5.0)):
@@ -313,8 +310,10 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if (callback_steps is None) or (
-            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        if (
+            callback_steps is None
+            or not isinstance(callback_steps, int)
+            or callback_steps <= 0
         ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
@@ -383,11 +382,11 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                 device=latents_device,
                 dtype=text_embeddings.dtype,
             )
-        else:
-            if latents.shape != latents_shape:
-                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
+        elif latents.shape == latents_shape:
             latents = latents.to(latents_device)
 
+        else:
+            raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
 
@@ -441,10 +440,13 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 
-        if not return_dict:
-            return (image, has_nsfw_concept)
-
-        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
+        return (
+            StableDiffusionPipelineOutput(
+                images=image, nsfw_content_detected=has_nsfw_concept
+            )
+            if return_dict
+            else (image, has_nsfw_concept)
+        )
 
     def generate_inputs(self, prompt_a, prompt_b, seed_a, seed_b, noise_shape, T, batch_size):
         embeds_a = self.embed_text(prompt_a)
@@ -529,12 +531,12 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                     guidance_scale=guidance_scale,
                     eta=eta,
                     num_inference_steps=num_inference_steps,
-                    output_type="pil" if not upsample else "numpy",
+                    output_type="numpy" if upsample else "pil",
                 )["sample"]
 
                 for image in outputs:
                     frame_filepath = save_path / (f"frame%06d{image_file_ext}" % frame_index)
-                    image = image if not upsample else self.upsampler(image)
+                    image = self.upsampler(image) if upsample else image
                     image.save(frame_filepath)
                     frame_index += 1
 
@@ -711,8 +713,7 @@ class StableDiffusionWalkPipeline(DiffusionPipeline):
                     print(f"Skipping {save_path} because frames already exist")
                     continue
 
-                existing_frames = sorted(save_path.glob(f"*{image_file_ext}"))
-                if existing_frames:
+                if existing_frames := sorted(save_path.glob(f"*{image_file_ext}")):
                     skip = int(existing_frames[-1].stem[-6:]) + 1
                     if skip + 1 >= num_step:
                         print(f"Skipping {save_path} because frames already exist")

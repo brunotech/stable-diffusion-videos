@@ -31,10 +31,12 @@ def fn_images(
             prompt,
             guidance_scale=guidance_scale,
             num_inference_steps=num_inference_steps,
-            generator=torch.Generator(device=pipeline.device).manual_seed(seed),
-            output_type="pil" if not upsample else "numpy",
+            generator=torch.Generator(device=pipeline.device).manual_seed(
+                seed
+            ),
+            output_type="numpy" if upsample else "pil",
         )["sample"][0]
-        return img if not upsample else pipeline.upsampler(img)
+        return pipeline.upsampler(img) if upsample else img
 
 
 def fn_videos(
@@ -54,7 +56,7 @@ def fn_videos(
     prompts = [x for x in prompts if x.strip()]
     seeds = seeds[: len(prompts)]
 
-    video_path = pipeline.walk(
+    return pipeline.walk(
         guidance_scale=guidance_scale,
         prompts=prompts,
         seeds=seeds,
@@ -64,7 +66,6 @@ def fn_videos(
         name=time.strftime("%Y%m%d-%H%M%S"),
         upsample=upsample,
     )
-    return video_path
 
 
 interface_videos = gr.Interface(
